@@ -1,0 +1,379 @@
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Historias clínicas</h5>
+                <button class="btn btn-md btn-outline-primary d-inline-flex align-items-center justify-content-center"
+                    (click)="nuevaHistoria()" title="Registrar historia clínica">
+                    <i class="fa fa-plus" aria-hidden="true"></i>
+                    &nbsp; Nueva historia
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <!-- ===== Filtros ===== -->
+            <form [formGroup]="filtrosForm" class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <input class="form-control" formControlName="texto" type="text"
+                        placeholder="Mascota, cliente, veterinario o motivo" />
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" formControlName="medicoId">
+                        <option [ngValue]="null">Todos los veterinarios</option>
+                        <option *ngFor="let m of medicos" [ngValue]="m.id">{{ m.nombres }} {{ m.apellidos }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" formControlName="estado">
+                        <option value="">Todos los estados</option>
+                        <option *ngFor="let e of estados" [value]="e.valor">{{ e.etiqueta }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input class="form-control" type="date" formControlName="fechaDesde" title="Desde" />
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <input class="form-control" type="date" formControlName="fechaHasta" title="Hasta" />
+                        <button class="btn btn-outline-secondary" type="button" (click)="limpiarFiltros()"
+                            title="Limpiar filtros"><i class="fa fa-eraser"></i></button>
+                    </div>
+                </div>
+            </form>
+
+            <div *ngIf="procesando" class="progress mb-2" style="height: 4px" role="progressbar" aria-label="Procesando">
+                <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+            </div>
+            <div *ngIf="cargando" class="alert alert-info" role="status">Cargando historias clínicas...</div>
+            <div *ngIf="errorCarga" class="alert alert-danger" role="alert">
+                No fue posible cargar las historias clínicas. {{ mensajeError }}
+                <button class="btn btn-sm btn-outline-danger ms-2" type="button" (click)="listar()">Reintentar</button>
+            </div>
+
+            <!-- ===== Tabla ===== -->
+            <div class="table-responsive" *ngIf="!errorCarga">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-center sortable" (click)="ordenarPor('fecha')">
+                                Fecha <i class="fa" [ngClass]="iconoOrden('fecha')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('mascota')">
+                                Mascota <i class="fa" [ngClass]="iconoOrden('mascota')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('cliente')">
+                                Cliente <i class="fa" [ngClass]="iconoOrden('cliente')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('veterinario')">
+                                Veterinario <i class="fa" [ngClass]="iconoOrden('veterinario')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('motivo')">
+                                Motivo <i class="fa" [ngClass]="iconoOrden('motivo')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('estado')">
+                                Estado <i class="fa" [ngClass]="iconoOrden('estado')"></i></th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngIf="!cargando && historias.length === 0">
+                            <td colspan="7" class="text-center">No se encontraron historias clínicas</td>
+                        </tr>
+                        <tr *ngFor="let fila of historias">
+                            <td class="text-center">{{ fila.fechaHora | date:'yyyy-MM-dd HH:mm' }}</td>
+                            <td class="text-center">{{ fila.mascota }}</td>
+                            <td class="text-center">{{ fila.cliente }}</td>
+                            <td class="text-center">{{ fila.veterinario }}</td>
+                            <td class="text-center">{{ fila.motivo }}</td>
+                            <td class="text-center">
+                                <span class="badge" [ngClass]="claseEstado(fila.estado)">{{ etiquetaEstado(fila.estado) }}</span>
+                            </td>
+                            <td class="text-center text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" (click)="ver(fila)" [disabled]="procesando">
+                                    <i class="fa fa-eye"></i>&nbsp;Ver
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ms-1" *ngIf="fila.estado === 'ABIERTA'"
+                                    (click)="cerrarHistoria(fila)" [disabled]="procesando" title="Cerrar historia">
+                                    <i class="fa fa-lock"></i>&nbsp;Cerrar
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ===== Paginación ===== -->
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2" *ngIf="!errorCarga">
+                <span class="text-muted">
+                    {{ totalElementos }} historia(s) — Página {{ page + 1 }} de {{ totalPaginas || 1 }}
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select w-auto" (change)="cambiarTamano($event)" title="Registros por página">
+                        <option value="5" [selected]="size === 5">5</option>
+                        <option value="10" [selected]="size === 10">10</option>
+                        <option value="20" [selected]="size === 20">20</option>
+                        <option value="50" [selected]="size === 50">50</option>
+                    </select>
+                    <button class="btn btn-outline-secondary" type="button" [disabled]="page === 0"
+                        (click)="irAPagina(page - 1)">Anterior</button>
+                    <button class="btn btn-outline-secondary" type="button" [disabled]="page + 1 >= totalPaginas"
+                        (click)="irAPagina(page + 1)">Siguiente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal crear historia ===================== -->
+<div class="modal fade" id="modalHistoria" tabindex="-1" aria-labelledby="modalHistoriaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" [formGroup]="form" (ngSubmit)="guardar()">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="modalHistoriaLabel">Registrar historia clínica</h1>
+                <button type="button" class="btn-close" aria-label="Close" (click)="cerrarFormulario()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="hCliente">Cliente <span class="text-danger">*</span></label>
+                        <select id="hCliente" class="form-select" formControlName="clienteId">
+                            <option [ngValue]="null">Seleccione un cliente</option>
+                            <option *ngFor="let c of clientes" [ngValue]="c.clienteId">
+                                {{ c.nombres }} {{ c.apellidos }} - {{ c.numeroDocumento }}
+                            </option>
+                        </select>
+                        <div *ngIf="f['clienteId'].invalid && f['clienteId'].touched" class="text-danger small mt-1">
+                            El cliente es obligatorio.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="hMascota">Mascota <span class="text-danger">*</span></label>
+                        <select id="hMascota" class="form-select" formControlName="mascotaId">
+                            <option [ngValue]="null">{{ cargandoMascotas ? 'Cargando mascotas...' : 'Seleccione una mascota' }}</option>
+                            <option *ngFor="let m of mascotas" [ngValue]="m.mascotaId">{{ m.nombreMascota }}</option>
+                        </select>
+                        <div *ngIf="f['mascotaId'].invalid && f['mascotaId'].touched" class="text-danger small mt-1">
+                            La mascota es obligatoria.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="hCita">Cita atendida <span class="text-danger">*</span></label>
+                        <select id="hCita" class="form-select" formControlName="citaId">
+                            <option [ngValue]="null">{{ cargandoCitas ? 'Cargando citas...' : 'Seleccione una cita' }}</option>
+                            <option *ngFor="let c of citas" [ngValue]="c.citaId">
+                                {{ c.fechaHora | date:'yyyy-MM-dd HH:mm' }} - {{ c.motivo }}
+                            </option>
+                        </select>
+                        <div *ngIf="f['citaId'].enabled && !cargandoCitas && citas.length === 0" class="text-muted small mt-1">
+                            Esta mascota no tiene citas atendidas.</div>
+                        <div *ngIf="f['citaId'].invalid && f['citaId'].touched" class="text-danger small mt-1">
+                            La cita es obligatoria.</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="hMedico">Veterinario <span class="text-danger">*</span></label>
+                        <select id="hMedico" class="form-select" formControlName="medicoId">
+                            <option [ngValue]="null">Seleccione un veterinario</option>
+                            <option *ngFor="let m of medicos" [ngValue]="m.id">{{ m.nombres }} {{ m.apellidos }}</option>
+                        </select>
+                        <div *ngIf="f['medicoId'].invalid && f['medicoId'].touched" class="text-danger small mt-1">
+                            El veterinario es obligatorio.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="hFecha">Fecha y hora de la consulta <span class="text-danger">*</span></label>
+                        <input id="hFecha" class="form-control" type="datetime-local" formControlName="fechaHora"
+                            [attr.max]="maxFechaHora" />
+                        <div *ngIf="f['fechaHora'].touched && f['fechaHora'].errors?.['required']" class="text-danger small mt-1">
+                            La fecha y hora son obligatorias.</div>
+                        <div *ngIf="f['fechaHora'].errors?.['futura']" class="text-danger small mt-1">
+                            La consulta no puede ser en el futuro.</div>
+                        <div *ngIf="f['fechaHora'].errors?.['anteriorACita']" class="text-danger small mt-1">
+                            No puede ser anterior a la fecha de la cita.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" for="hMotivo">Motivo de consulta <span class="text-danger">*</span></label>
+                        <input id="hMotivo" class="form-control" type="text" formControlName="motivo" />
+                        <div *ngIf="f['motivo'].invalid && f['motivo'].touched" class="text-danger small mt-1">
+                            El motivo es obligatorio (máximo 255 caracteres).</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="hDiagnostico">Diagnóstico <span class="text-danger">*</span></label>
+                        <textarea id="hDiagnostico" class="form-control" rows="3" formControlName="diagnostico"></textarea>
+                        <div *ngIf="f['diagnostico'].invalid && f['diagnostico'].touched" class="text-danger small mt-1">
+                            El diagnóstico es obligatorio (máximo 2000 caracteres).</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="hObs">Observaciones</label>
+                        <textarea id="hObs" class="form-control" rows="2" formControlName="observaciones"></textarea>
+                        <div *ngIf="f['observaciones'].invalid" class="text-danger small mt-1">
+                            Máximo 2000 caracteres.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="cerrarFormulario()">Cerrar</button>
+                <button type="submit" class="btn btn-primary" [disabled]="guardando">
+                    <span *ngIf="guardando" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                    Guardar historia
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===================== Modal Ver: detalle + anotaciones ===================== -->
+<div class="modal fade" id="modalVerHistoria" tabindex="-1" aria-labelledby="modalVerHistoriaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="modalVerHistoriaLabel">Detalle de la historia clínica</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" *ngIf="historiaDetalle as d">
+
+                <!-- Datos de la historia -->
+                <dl class="row dl-detalle mb-3">
+                    <dt class="col-sm-3">Estado</dt>
+                    <dd class="col-sm-9"><span class="badge" [ngClass]="claseEstado(d.estado)">{{ etiquetaEstado(d.estado) }}</span></dd>
+                    <dt class="col-sm-3">Fecha y hora</dt><dd class="col-sm-9">{{ d.fechaHora | date:'yyyy-MM-dd HH:mm' }}</dd>
+                    <dt class="col-sm-3">Cliente</dt><dd class="col-sm-9">{{ d.cliente }}</dd>
+                    <dt class="col-sm-3">Mascota</dt><dd class="col-sm-9">{{ d.mascota }}</dd>
+                    <dt class="col-sm-3">Veterinario</dt><dd class="col-sm-9">{{ d.veterinario }}</dd>
+                    <dt class="col-sm-3">Motivo</dt><dd class="col-sm-9">{{ d.motivo }}</dd>
+                    <dt class="col-sm-3">Diagnóstico</dt><dd class="col-sm-9 texto-largo">{{ d.diagnostico }}</dd>
+                    <dt class="col-sm-3">Observaciones</dt>
+                    <dd class="col-sm-9 texto-largo">{{ d.observaciones || '—' }}</dd>
+                </dl>
+
+                <hr />
+
+                <!-- Histórico de anotaciones -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Histórico de anotaciones</h6>
+                    <button class="btn btn-sm btn-outline-primary" type="button" *ngIf="d.estado === 'ABIERTA'"
+                        (click)="alternarFormularioAnotacion()">
+                        <i class="fa" [ngClass]="mostrarFormAnotacion ? 'fa-minus' : 'fa-plus'"></i>&nbsp;
+                        {{ mostrarFormAnotacion ? 'Cancelar' : 'Nueva anotación' }}
+                    </button>
+                    <span class="badge bg-secondary" *ngIf="d.estado === 'CERRADA'">Historia cerrada: no admite anotaciones</span>
+                </div>
+
+                <!-- Formulario de nueva anotación -->
+                <form *ngIf="mostrarFormAnotacion" [formGroup]="anotForm" (ngSubmit)="guardarAnotacion()"
+                    class="border rounded p-3 mb-3">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label" for="aMedico">Veterinario <span class="text-danger">*</span></label>
+                            <select id="aMedico" class="form-select" formControlName="medicoId">
+                                <option [ngValue]="null">Seleccione</option>
+                                <option *ngFor="let m of medicos" [ngValue]="m.id">{{ m.nombres }} {{ m.apellidos }}</option>
+                            </select>
+                            <div *ngIf="fa['medicoId'].invalid && fa['medicoId'].touched" class="text-danger small mt-1">
+                                El veterinario es obligatorio.</div>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="aDesc">Descripción <span class="text-danger">*</span></label>
+                            <input id="aDesc" class="form-control" type="text" formControlName="descripcion" />
+                            <div *ngIf="fa['descripcion'].invalid && fa['descripcion'].touched" class="text-danger small mt-1">
+                                La descripción es obligatoria (máximo 500 caracteres).</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="aObs">Observación</label>
+                            <textarea id="aObs" class="form-control" rows="2" formControlName="observacion"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="aDiag">Diagnóstico / evolución <span class="text-danger">*</span></label>
+                            <textarea id="aDiag" class="form-control" rows="2" formControlName="diagnosticoEvolucion"></textarea>
+                            <div *ngIf="fa['diagnosticoEvolucion'].invalid && fa['diagnosticoEvolucion'].touched"
+                                class="text-danger small mt-1">El diagnóstico o evolución es obligatorio.</div>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-primary btn-sm" [disabled]="guardandoAnotacion">
+                                <span *ngIf="guardandoAnotacion" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                Guardar anotación
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Filtros del histórico -->
+                <form [formGroup]="anotFiltrosForm" class="row g-2 mb-2">
+                    <div class="col-md-5">
+                        <input class="form-control form-control-sm" type="text" formControlName="texto"
+                            placeholder="Buscar en descripción, observación, evolución o veterinario" />
+                    </div>
+                    <div class="col-md-3">
+                        <input class="form-control form-control-sm" type="date" formControlName="fechaDesde" title="Desde" />
+                    </div>
+                    <div class="col-md-4">
+                        <div class="input-group input-group-sm">
+                            <input class="form-control" type="date" formControlName="fechaHasta" title="Hasta" />
+                            <button class="btn btn-outline-secondary" type="button" (click)="limpiarFiltrosAnotaciones()"
+                                title="Limpiar filtros"><i class="fa fa-eraser"></i></button>
+                        </div>
+                    </div>
+                </form>
+
+                <div *ngIf="cargandoAnotaciones" class="alert alert-info py-2" role="status">Cargando anotaciones...</div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th class="text-center sortable" (click)="ordenarAnotaciones()">
+                                    Fecha y hora
+                                    <i class="fa" [ngClass]="anotSortDir === 'asc' ? 'fa-sort-up' : 'fa-sort-down'"></i></th>
+                                <th class="text-center">Veterinario</th>
+                                <th>Descripción</th>
+                                <th class="text-center">Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngIf="!cargandoAnotaciones && anotaciones.length === 0">
+                                <td colspan="4" class="text-center">Esta historia aún no tiene anotaciones</td>
+                            </tr>
+                            <tr *ngFor="let a of anotaciones">
+                                <td class="text-center text-nowrap">{{ a.fechaHora | date:'yyyy-MM-dd HH:mm' }}</td>
+                                <td class="text-center">{{ a.veterinario }}</td>
+                                <td>{{ a.descripcion }}</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary" type="button" (click)="verAnotacion(a)"
+                                        title="Ver detalle de la anotación"><i class="fa fa-eye"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación de anotaciones -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">
+                        {{ anotTotalElementos }} anotación(es) — Página {{ anotPage + 1 }} de {{ anotTotalPaginas || 1 }}
+                    </span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" type="button" [disabled]="anotPage === 0"
+                            (click)="irAPaginaAnotaciones(anotPage - 1)">Anterior</button>
+                        <button class="btn btn-outline-secondary" type="button" [disabled]="anotPage + 1 >= anotTotalPaginas"
+                            (click)="irAPaginaAnotaciones(anotPage + 1)">Siguiente</button>
+                    </div>
+                </div>
+
+                <!-- Detalle de una anotación -->
+                <div class="card border-primary mt-3" *ngIf="anotacionDetalle as an">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                        <strong>Detalle de la anotación</strong>
+                        <button type="button" class="btn-close" aria-label="Cerrar detalle" (click)="anotacionDetalle = null"></button>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row dl-detalle mb-0">
+                            <dt class="col-sm-3">Fecha y hora</dt><dd class="col-sm-9">{{ an.fechaHora | date:'yyyy-MM-dd HH:mm' }}</dd>
+                            <dt class="col-sm-3">Veterinario</dt><dd class="col-sm-9">{{ an.veterinario }}</dd>
+                            <dt class="col-sm-3">Descripción</dt><dd class="col-sm-9 texto-largo">{{ an.descripcion }}</dd>
+                            <dt class="col-sm-3">Observación</dt><dd class="col-sm-9 texto-largo">{{ an.observacion || '—' }}</dd>
+                            <dt class="col-sm-3">Diagnóstico / evolución</dt>
+                            <dd class="col-sm-9 texto-largo">{{ an.diagnosticoEvolucion }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>

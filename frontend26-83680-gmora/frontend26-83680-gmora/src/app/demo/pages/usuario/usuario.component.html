@@ -1,0 +1,201 @@
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <div class="row">
+                <div class="col col-md-9">
+                    <input class="form-control" placeholder="Buscar cliente" type="text"
+                        (input)="actualizarBusqueda($event)" />
+                </div>
+                <div class="col col-md-3 text-end">
+                    <button
+                        class="btn btn-md btn-outline-primary d-inline-flex align-items-center justify-content-center"
+                        (click)="nuevoCliente('C')" title="Agregar cliente">
+                        <i class="fa fa-plus" aria-hidden="true"></i>
+                        &nbsp; Nuevo
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div *ngIf="cargando" class="alert alert-info" role="status">Cargando clientes...</div>
+            <div *ngIf="errorCarga" class="alert alert-danger" role="alert">
+                No fue posible cargar los clientes. Verifica que la API esté disponible e inténtalo de nuevo.
+                <button class="btn btn-sm btn-outline-danger ms-2" type="button" (click)="listar()">Reintentar</button>
+            </div>
+            <div class="row">
+                <div class="table-responsive table-condensed col col-md-12" *ngIf="!cargando && !errorCarga">
+                    <table class="table table-stripped table-condensed table-responsive">
+                        <thead>
+                            <tr>
+                                <th class="text-center">Tipo Doc</th>
+                                <th class="text-center">Número Doc.</th>
+                                <th class="text-center">Nombres</th>
+                                <th class="text-center">Apellidos</th>
+                                <th class="text-center">Fecha de Nacimiento</th>
+                                <th class="text-center">Teléfono</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody *ngIf="listClientes.length === 0">
+                            <tr>
+                                <td colspan="8" class="text-center">No hay clientes registrados</td>
+                            </tr>
+                        </tbody>
+                        <tbody *ngIf="listClientes.length > 0 && clientesFiltrados.length === 0">
+                            <tr>
+                                <td colspan="8" class="text-center">No se encontraron clientes</td>
+                            </tr>
+                        </tbody>
+                        <tbody *ngIf="clientesFiltrados.length > 0">
+                            <tr *ngFor="let cliente of clientesPaginados">
+                                <td class="text-center">{{ cliente.tipoDocumento }}</td>
+                                <td class="text-center">{{ cliente.numeroDocumento }}</td>
+                                <td class="text-center">{{ cliente.nombres }}</td>
+                                <td class="text-center">{{ cliente.apellidos }}</td>
+                                <td class="text-center">{{ cliente.fechaNacimiento | date:'dd/MM/yyyy' }}</td>
+                                <td class="text-center">{{ cliente.telefono || '—' }}</td>
+                                <td class="text-center">
+                                    <span class="badge" [ngClass]="cliente.activo ? 'bg-success' : 'bg-secondary'">
+                                        {{ cliente.activo ? 'Activo' : 'Inactivo' }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <button
+                                        class="btn btn-outline-info d-inline-flex align-items-center justify-content-center"
+                                        (click)="abrirEdicion(cliente)">
+                                        <i class="fa fa-edit"></i>&nbsp;Editar
+                                    </button>
+                                    <button
+                                        class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center ms-2"
+                                        (click)="eliminar(cliente)">
+                                        <i class="fa fa-trash"></i>&nbsp;Eliminar
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <nav *ngIf="!cargando && !errorCarga && totalPaginas > 1" aria-label="Paginación de clientes">
+                <ul class="pagination justify-content-end mb-0">
+                    <li class="page-item" [class.disabled]="paginaActual === 1">
+                        <button class="page-link" type="button" [disabled]="paginaActual === 1"
+                            (click)="cambiarPagina(paginaActual - 1)">Anterior</button>
+                    </li>
+                    <li class="page-item" *ngFor="let pagina of paginas" [class.active]="pagina === paginaActual">
+                        <button class="page-link" type="button"
+                            [attr.aria-current]="pagina === paginaActual ? 'page' : null"
+                            (click)="cambiarPagina(pagina)">{{ pagina }}</button>
+                    </li>
+                    <li class="page-item" [class.disabled]="paginaActual === totalPaginas">
+                        <button class="page-link" type="button" [disabled]="paginaActual === totalPaginas"
+                            (click)="cambiarPagina(paginaActual + 1)">Siguiente</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="modalCrearCliente" tabindex="-1" aria-labelledby="modalCrearClienteLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" [formGroup]="form" (ngSubmit)="guardar()">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="modalCrearClienteLabel">{{ titleModal }}</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+                    (click)="closeModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="clienteTipoDocumento">Tipo de documento</label>
+                                <select id="clienteTipoDocumento" class="form-select" formControlName="tipoDocumento">
+                                    <option value="CC">Cédula de ciudadanía</option>
+                                    <option value="CE">Cédula de extranjería</option>
+                                    <option value="NIT">NIT</option>
+                                    <option value="PP">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label" for="clienteNumeroDocumento">Número de documento <span
+                                        class="text-danger">*</span></label>
+                                <input id="clienteNumeroDocumento" class="form-control" type="text"
+                                    formControlName="numeroDocumento" placeholder="Ej: 80000001" />
+                                <div *ngIf="f['numeroDocumento'].invalid && f['numeroDocumento'].touched"
+                                    class="text-danger small mt-1">
+                                    El número de documento es obligatorio.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="clienteNombres">Nombres <span class="text-danger">*</span></label>
+                                <input id="clienteNombres" class="form-control" type="text" formControlName="nombres"
+                                    placeholder="Ej: Ana" />
+                                <div *ngIf="f['nombres'].invalid && f['nombres'].touched" class="text-danger small mt-1">
+                                    Los nombres son obligatorios.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="clienteApellidos">Apellidos <span class="text-danger">*</span></label>
+                                <input id="clienteApellidos" class="form-control" type="text" formControlName="apellidos"
+                                    placeholder="Ej: Pérez" />
+                                <div *ngIf="f['apellidos'].invalid && f['apellidos'].touched"
+                                    class="text-danger small mt-1">
+                                    Los apellidos son obligatorios.
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="clienteFechaNacimiento">Fecha de nacimiento <span
+                                        class="text-danger">*</span></label>
+                                <input id="clienteFechaNacimiento" class="form-control" type="date"
+                                    formControlName="fechaNacimiento" />
+                                <div *ngIf="f['fechaNacimiento'].invalid && f['fechaNacimiento'].touched"
+                                    class="text-danger small mt-1">
+                                    La fecha de nacimiento es obligatoria.
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="clienteGenero">Género</label>
+                                <select id="clienteGenero" class="form-select" formControlName="genero">
+                                    <option value="">Sin especificar</option>
+                                    <option value="F">Femenino</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="O">Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="clienteTelefono">Teléfono</label>
+                                <input id="clienteTelefono" class="form-control" type="text" formControlName="telefono"
+                                    placeholder="Ej: 3105556677" />
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label" for="clienteDireccion">Dirección</label>
+                                <input id="clienteDireccion" class="form-control" type="text" formControlName="direccion"
+                                    placeholder="Ej: Calle 45 # 12-30" />
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="clienteActivo"
+                                        formControlName="activo" />
+                                    <label class="form-check-label" for="clienteActivo">Cliente activo</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                    (click)="closeModal()">Cerrar</button>
+                <button type="submit" class="btn btn-primary" [disabled]="guardando">
+                    <span *ngIf="guardando" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                    {{ titleBoton }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

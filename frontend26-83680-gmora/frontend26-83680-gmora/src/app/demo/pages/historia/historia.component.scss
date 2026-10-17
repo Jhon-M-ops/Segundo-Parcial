@@ -1,0 +1,13 @@
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.dl-detalle dt {
+    font-weight: 600;
+}
+
+.texto-largo {
+    white-space: pre-line;
+}

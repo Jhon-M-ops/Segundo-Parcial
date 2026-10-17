@@ -1,0 +1,270 @@
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Citas médicas</h5>
+                <button class="btn btn-md btn-outline-primary d-inline-flex align-items-center justify-content-center"
+                    (click)="nuevaCita()" title="Registrar cita">
+                    <i class="fa fa-plus" aria-hidden="true"></i>
+                    &nbsp; Nueva cita
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <!-- ===== Filtros ===== -->
+            <form [formGroup]="filtrosForm" class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <input class="form-control" formControlName="texto" type="text"
+                        placeholder="Cliente, mascota, veterinario o motivo" />
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" formControlName="medicoId">
+                        <option [ngValue]="null">Todos los veterinarios</option>
+                        <option *ngFor="let m of medicos" [ngValue]="m.id">{{ m.nombres }} {{ m.apellidos }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" formControlName="estado">
+                        <option value="">Todos los estados</option>
+                        <option *ngFor="let e of estados" [value]="e.valor">{{ e.etiqueta }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input class="form-control" type="date" formControlName="fechaDesde" title="Desde" />
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <input class="form-control" type="date" formControlName="fechaHasta" title="Hasta" />
+                        <button class="btn btn-outline-secondary" type="button" (click)="limpiarFiltros()"
+                            title="Limpiar filtros"><i class="fa fa-eraser"></i></button>
+                    </div>
+                </div>
+            </form>
+
+            <div *ngIf="procesando" class="progress mb-2" style="height: 4px" role="progressbar" aria-label="Procesando">
+                <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+            </div>
+            <div *ngIf="cargando" class="alert alert-info" role="status">Cargando citas...</div>
+            <div *ngIf="errorCarga" class="alert alert-danger" role="alert">
+                No fue posible cargar las citas. {{ mensajeError }}
+                <button class="btn btn-sm btn-outline-danger ms-2" type="button" (click)="listar()">Reintentar</button>
+            </div>
+
+            <!-- ===== Tabla ===== -->
+            <div class="table-responsive" *ngIf="!errorCarga">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-center sortable" (click)="ordenarPor('fecha')">
+                                Fecha <i class="fa" [ngClass]="iconoOrden('fecha')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('hora')">
+                                Hora <i class="fa" [ngClass]="iconoOrden('hora')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('cliente')">
+                                Cliente <i class="fa" [ngClass]="iconoOrden('cliente')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('mascota')">
+                                Mascota <i class="fa" [ngClass]="iconoOrden('mascota')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('veterinario')">
+                                Veterinario <i class="fa" [ngClass]="iconoOrden('veterinario')"></i></th>
+                            <th class="text-center sortable" (click)="ordenarPor('estado')">
+                                Estado <i class="fa" [ngClass]="iconoOrden('estado')"></i></th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngIf="!cargando && citas.length === 0">
+                            <td colspan="7" class="text-center">No se encontraron citas</td>
+                        </tr>
+                        <tr *ngFor="let fila of citas">
+                            <td class="text-center">{{ fila.fechaHora | date:'yyyy-MM-dd' }}</td>
+                            <td class="text-center">{{ fila.fechaHora | date:'HH:mm' }}</td>
+                            <td class="text-center">{{ fila.cliente }}</td>
+                            <td class="text-center">{{ fila.mascota }}</td>
+                            <td class="text-center">{{ fila.veterinario }}</td>
+                            <td class="text-center">
+                                <span class="badge" [ngClass]="claseEstado(fila.estado)">{{ etiquetaEstado(fila.estado) }}</span>
+                            </td>
+                            <td class="text-center text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary" title="Ver detalle" (click)="ver(fila)" [disabled]="procesando">
+                                    <i class="fa fa-eye"></i></button>
+                                <button class="btn btn-sm btn-outline-info ms-1" title="Editar"
+                                    *ngIf="puedeEditar(fila.estado)" (click)="editar(fila)" [disabled]="procesando">
+                                    <i class="fa fa-edit"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary ms-1" title="Confirmar"
+                                    *ngIf="puedePasarA(fila.estado, 'CONFIRMADA')" (click)="cambiarEstado(fila, 'CONFIRMADA')" [disabled]="procesando">
+                                    <i class="fa fa-check"></i></button>
+                                <button class="btn btn-sm btn-outline-success ms-1" title="Marcar como atendida"
+                                    *ngIf="puedePasarA(fila.estado, 'ATENDIDA')" (click)="cambiarEstado(fila, 'ATENDIDA')" [disabled]="procesando">
+                                    <i class="fa fa-stethoscope"></i></button>
+                                <button class="btn btn-sm btn-outline-danger ms-1" title="Cancelar"
+                                    *ngIf="puedePasarA(fila.estado, 'CANCELADA')" (click)="cambiarEstado(fila, 'CANCELADA')" [disabled]="procesando">
+                                    <i class="fa fa-ban"></i></button>
+                                <button class="btn btn-sm btn-outline-warning ms-1" title="Reactivar"
+                                    *ngIf="fila.estado === 'CANCELADA'" (click)="reactivar(fila)" [disabled]="procesando">
+                                    <i class="fa fa-undo"></i></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ===== Paginación ===== -->
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2" *ngIf="!errorCarga">
+                <span class="text-muted">
+                    {{ totalElementos }} cita(s) — Página {{ page + 1 }} de {{ totalPaginas || 1 }}
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select w-auto" (change)="cambiarTamano($event)" title="Registros por página">
+                        <option value="5" [selected]="size === 5">5</option>
+                        <option value="10" [selected]="size === 10">10</option>
+                        <option value="20" [selected]="size === 20">20</option>
+                        <option value="50" [selected]="size === 50">50</option>
+                    </select>
+                    <button class="btn btn-outline-secondary" type="button" [disabled]="page === 0"
+                        (click)="irAPagina(page - 1)">Anterior</button>
+                    <button class="btn btn-outline-secondary" type="button" [disabled]="page + 1 >= totalPaginas"
+                        (click)="irAPagina(page + 1)">Siguiente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal crear / editar ===================== -->
+<div class="modal fade" id="modalCita" tabindex="-1" aria-labelledby="modalCitaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" [formGroup]="form" (ngSubmit)="guardar()">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="modalCitaLabel">
+                    {{ modoFormulario === 'C' ? 'Registrar cita' : 'Editar cita' }}
+                </h1>
+                <button type="button" class="btn-close" aria-label="Close" (click)="cerrarFormulario()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+
+                    <!-- Cliente → Mascota (solo al crear) -->
+                    <ng-container *ngIf="modoFormulario === 'C'; else soloLectura">
+                        <div class="col-md-6">
+                            <label class="form-label" for="cCliente">Cliente <span class="text-danger">*</span></label>
+                            <select id="cCliente" class="form-select" formControlName="clienteId">
+                                <option [ngValue]="null">Seleccione un cliente</option>
+                                <option *ngFor="let c of clientes" [ngValue]="c.clienteId">
+                                    {{ c.nombres }} {{ c.apellidos }} - {{ c.numeroDocumento }}
+                                </option>
+                            </select>
+                            <div *ngIf="f['clienteId'].invalid && f['clienteId'].touched" class="text-danger small mt-1">
+                                El cliente es obligatorio.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="cMascota">Mascota <span class="text-danger">*</span></label>
+                            <select id="cMascota" class="form-select" formControlName="mascotaId">
+                                <option [ngValue]="null">{{ cargandoMascotas ? 'Cargando mascotas...' : 'Seleccione una mascota' }}</option>
+                                <option *ngFor="let m of mascotas" [ngValue]="m.mascotaId">{{ m.nombreMascota }}</option>
+                            </select>
+                            <div *ngIf="f['mascotaId'].invalid && f['mascotaId'].touched" class="text-danger small mt-1">
+                                La mascota es obligatoria.</div>
+                        </div>
+                    </ng-container>
+                    <ng-template #soloLectura>
+                        <div class="col-12">
+                            <div class="alert alert-light border mb-0">
+                                <strong>Cliente:</strong> {{ citaEditando?.cliente }} &nbsp;|&nbsp;
+                                <strong>Mascota:</strong> {{ citaEditando?.mascota }} &nbsp;|&nbsp;
+                                <strong>Estado:</strong>
+                                <span class="badge ms-1" [ngClass]="claseEstado(citaEditando?.estado ?? '')">
+                                    {{ etiquetaEstado(citaEditando?.estado ?? '') }}</span>
+                                <br><small class="text-muted">
+                                    El cliente y la mascota no pueden cambiarse.
+                                    <ng-container *ngIf="citaEditando?.estado === 'CONFIRMADA'">
+                                        Como la cita ya fue confirmada, solo puede modificarse el motivo.
+                                    </ng-container>
+                                </small>
+                            </div>
+                        </div>
+                    </ng-template>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="cMedico">Veterinario <span class="text-danger">*</span></label>
+                        <select id="cMedico" class="form-select" formControlName="medicoId">
+                            <option [ngValue]="null">Seleccione un veterinario</option>
+                            <option *ngFor="let m of medicos" [ngValue]="m.id">{{ m.nombres }} {{ m.apellidos }}</option>
+                        </select>
+                        <div *ngIf="f['medicoId'].invalid && f['medicoId'].touched" class="text-danger small mt-1">
+                            El veterinario es obligatorio.</div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label" for="cFecha">Fecha <span class="text-danger">*</span></label>
+                        <input id="cFecha" class="form-control" type="date" formControlName="fecha" [attr.min]="hoy" />
+                        <div *ngIf="f['fecha'].invalid && f['fecha'].touched" class="text-danger small mt-1">
+                            La fecha es obligatoria.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="cHora">Hora <span class="text-danger">*</span></label>
+                        <input id="cHora" class="form-control" type="time" formControlName="hora" />
+                        <div *ngIf="f['hora'].invalid && f['hora'].touched" class="text-danger small mt-1">
+                            La hora es obligatoria.</div>
+                    </div>
+                    <div class="col-12" *ngIf="form.errors?.['fechaHoraPasada']">
+                        <div class="text-danger small">No se pueden registrar citas en fechas u horas anteriores a la actual.</div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label" for="cMotivo">Motivo de la consulta <span class="text-danger">*</span></label>
+                        <input id="cMotivo" class="form-control" type="text" formControlName="motivo"
+                            placeholder="Ej: Vacunación anual" />
+                        <div *ngIf="f['motivo'].invalid && f['motivo'].touched" class="text-danger small mt-1">
+                            El motivo es obligatorio (máximo 255 caracteres).</div>
+                    </div>
+                    <div class="col-md-4" *ngIf="modoFormulario === 'C'">
+                        <label class="form-label" for="cEstado">Estado <span class="text-danger">*</span></label>
+                        <select id="cEstado" class="form-select" formControlName="estado">
+                            <option *ngFor="let e of estadosIniciales" [value]="e.valor">{{ e.etiqueta }}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="cerrarFormulario()">Cerrar</button>
+                <button type="submit" class="btn btn-primary" [disabled]="guardando">
+                    <span *ngIf="guardando" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                    {{ modoFormulario === 'C' ? 'Guardar cita' : 'Actualizar cita' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===================== Modal Ver ===================== -->
+<div class="modal fade" id="modalVerCita" tabindex="-1" aria-labelledby="modalVerCitaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="modalVerCitaLabel">Detalle de la cita</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" *ngIf="citaDetalle as d">
+                <dl class="row dl-detalle mb-0">
+                    <dt class="col-sm-4">Estado</dt>
+                    <dd class="col-sm-8"><span class="badge" [ngClass]="claseEstado(d.estado)">{{ etiquetaEstado(d.estado) }}</span></dd>
+                    <dt class="col-sm-4">Fecha</dt><dd class="col-sm-8">{{ d.fechaHora | date:'yyyy-MM-dd' }}</dd>
+                    <dt class="col-sm-4">Hora</dt><dd class="col-sm-8">{{ d.fechaHora | date:'HH:mm' }}</dd>
+                    <dt class="col-sm-4">Cliente</dt><dd class="col-sm-8">{{ d.cliente }}</dd>
+                    <dt class="col-sm-4">Mascota</dt><dd class="col-sm-8">{{ d.mascota }}</dd>
+                    <dt class="col-sm-4">Veterinario</dt><dd class="col-sm-8">{{ d.veterinario }}</dd>
+                    <dt class="col-sm-4">Motivo</dt><dd class="col-sm-8">{{ d.motivo }}</dd>
+                </dl>
+                <div *ngIf="d.estado === 'ATENDIDA'" class="alert alert-success mt-3 mb-0">
+                    Cita atendida: forma parte del historial clínico y no admite modificaciones.
+                </div>
+                <div *ngIf="d.estado === 'CANCELADA'" class="alert alert-warning mt-3 mb-0">
+                    Cita cancelada: solo puede volver a activarse con la opción Reactivar.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>

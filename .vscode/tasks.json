@@ -1,0 +1,61 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Spring Boot API :8080",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"\"C:\\Program Files\\apache-maven-3.9.12\\bin\\mvn.cmd\" spring-boot:run"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}\\backend-83680-gmora\\backend-83680-gmora",
+				"env": {
+					"JAVA_HOME": "C:\\Program Files\\Java\\jdk-25.0.2",
+					"DB_USERNAME": "${input:dbUsername}",
+					"DB_PASSWORD": "${input:dbPassword}"
+				}
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Angular Frontend :4200",
+			"type": "shell",
+			"command": "cmd.exe",
+			"args": [
+				"/c",
+				"npm.cmd start -- --host localhost --port 4200"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}\\frontend26-83680-gmora\\frontend26-83680-gmora"
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Start Veterinary App (Frontend + Backend)",
+			"dependsOn": [
+				"Spring Boot API :8080",
+				"Angular Frontend :4200"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "dbUsername",
+			"type": "promptString",
+			"description": "MySQL username",
+			"default": "root"
+		},
+		{
+			"id": "dbPassword",
+			"type": "promptString",
+			"description": "MySQL password",
+			"password": true
+		}
+	]
+}
